@@ -1,0 +1,193 @@
+Queries from Treehouse Training SQL course
+
+-- How many students do they have at Jefferson Middle School?
+
+SELECT COUNT(*) FROM students; 
+
+
+-- What's Yvette Levy's student ID number?
+
+SELECT ID FROM students WHERE first_name = "Yvette" AND last_name = "Levy";
+
+
+-- Generate a list of teachers sorted alphabetically by last name.
+
+SELECT first_name, last_name FROM teachers ORDER BY last_name ASC;
+
+
+-- Which students have last names starting with 'A'?
+
+SELECT * FROM students WHERE last_name LIKE 'A%';
+
+
+-- What's the total capacity of the school? 
+
+SELECT SUM(capacity) FROM rooms;
+
+
+-- Which room has the largest capacity?
+
+SELECT * FROM rooms ORDER BY capacity DESC LIMIT 1;
+-- Alternatively...
+SELECT ID, MAX(capacity) AS Capacity FROM rooms;
+
+
+-- Which subjects are taught in room 19?
+
+SELECT name AS Subjects FROM subjects 
+WHERE ID IN 
+(SELECT DISTINCT(subject_ID) FROM classes WHERE room_ID = 19);
+
+-- Alternatively...
+
+SELECT DISTINCT(Name) AS "Subjects" FROM classes 
+JOIN subjects ON classes.subject_ID = subjects.ID 
+WHERE room_ID = 19;
+
+
+-- Which teachers teach only 8th grade? 
+
+SELECT DISTINCT(teachers.ID), first_name, last_name FROM teachers 
+JOIN classes ON teachers.ID = classes.teacher_ID
+JOIN subjects ON classes.subject_ID = subjects.ID
+WHERE grade = 8;
+
+
+-- Who teaches 7th grade science? 
+
+SELECT DISTINCT(teachers.ID), first_name AS "First Name", last_name AS "Last Name" FROM subjects 
+JOIN classes ON subjects.ID = classes.subject_ID
+JOIN teachers ON classes.teacher_ID = teachers.ID
+WHERE grade = 7 AND name = "Science";
+
+
+-- Which teachers teach elective subjects (subjects without grade levels)?
+
+SELECT DISTINCT(teachers.ID), first_name AS "First Name", last_name AS "Last Name" FROM classes
+JOIN teachers ON classes.teacher_ID = teachers.ID
+JOIN subjects ON classes.subject_ID = subjects.ID
+WHERE grade IS NULL;
+
+
+
+-- Generate a schedule for Rex Rios
+
+SELECT subjects.Name AS "Subject", periods.start_time AS "Start Time" FROM schedule
+JOIN classes ON schedule.class_ID = classes.ID
+JOIN students ON schedule.student_ID = students.ID
+JOIN subjects ON classes.subject_ID = subjects.ID
+JOIN periods ON classes.period_ID = periods.ID
+WHERE students.first_name = "Rex" AND students.last_name = "Rios" ORDER BY periods.ID;
+
+
+-- How many students have Physical Education during first period?
+
+SELECT COUNT(student_ID) AS "Number of Students" FROM classes
+JOIN subjects ON classes.subject_ID = subjects.ID
+JOIN schedule ON classes.ID = schedule.class_ID
+WHERE name = "Physical Education" AND classes.period_ID = 1;
+
+
+-- Generate a list of students with last names from A to M
+
+SELECT first_name, last_name FROM students 
+WHERE last_name >= 'A' AND last_name < 'N' 
+ORDER BY last_name ASC;
+
+
+-- How many students are in each grade?
+
+SELECT Grade AS "Grade", COUNT(*) AS "Number of Students" FROM students
+GROUP BY grade;
+
+
+-- Is there room for 220 6th graders?
+
+SELECT MIN(capacity) * 7 AS "Max Capacity for 6th Graders" FROM classes 
+JOIN subjects ON subjects.ID = classes.subject_ID 
+JOIN rooms ON rooms.ID = classes.room_ID
+WHERE grade = 6;
+
+
+-- Which teachers teach a class during all 7 periods?
+
+SELECT teachers.ID, teachers.first_name, teachers.last_name, COUNT(*) FROM teachers 
+JOIN classes ON teachers.ID = classes.teacher_ID
+GROUP BY teachers.ID HAVING COUNT(*) = 7;
+
+
+-- Do any teachers teach multiple subjects?
+
+SELECT teachers.* FROM teachers 
+JOIN classes ON teachers.ID = classes.teacher_ID
+GROUP BY teachers.ID HAVING COUNT(DISTINCT subject_ID) > 1;
+
+
+-- Which class does Janis Ambrose teach during each period? 
+
+WITH janis_classes AS (SELECT period_ID, subjects.name FROM teachers 
+  JOIN classes ON teachers.ID = classes.teacher_ID
+  JOIN subjects ON subjects.ID = classes.subject_ID
+  WHERE teachers.ID = 391)
+  
+SELECT periods.ID, janis_classes.name FROM periods
+LEFT OUTER JOIN janis_classes ON periods.ID = period_ID;
+
+
+-- Which subject is the least popular, and how many students are taking it?
+
+WITH subject_counts AS (SELECT subjects.name, COUNT(*) AS "CT" FROM subjects
+JOIN classes ON subjects.ID = classes.subject_ID
+JOIN schedule ON classes.ID = schedule.class_ID
+GROUP BY subject_ID)
+
+SELECT name AS "Subject", min(CT) AS "Number of students" FROM subject_counts;
+
+
+-- Which students have 5th period science and 7th period art?
+
+WITH science AS (SELECT student_ID FROM students 
+  JOIN schedule ON students.ID = schedule.student_ID
+  JOIN classes ON classes.ID = schedule.class_ID
+  JOIN subjects ON subjects.ID = classes.subject_ID
+  WHERE period_ID = 5 AND subjects.name = "Science"),
+art AS (SELECT student_ID FROM students 
+  JOIN schedule ON students.ID = schedule.student_ID
+  JOIN classes ON classes.ID = schedule.class_ID
+  JOIN subjects ON subjects.ID = classes.subject_ID
+  WHERE period_ID = 7 AND subjects.name = "Art")
+
+SELECT students.* FROM science 
+JOIN art ON science.student_ID = art.student_ID
+JOIN students ON art.student_ID = students.ID;
+
+
+-- Which elective teacher teaches the most students?
+
+WITH elective AS (SELECT DISTINCT TEACHERS.ID, FIRST_NAME, LAST_NAME
+  FROM TEACHERS
+  JOIN CLASSES ON TEACHERS.ID = CLASSES.TEACHER_ID
+  JOIN SUBJECTS ON CLASSES.SUBJECT_ID = SUBJECTS.ID
+  WHERE GRADE IS NULL),
+students AS (
+  SELECT elective.ID, COUNT(*) AS CT 
+  FROM elective
+  JOIN classes ON elective.ID = classes.teacher_ID
+  JOIN schedule ON classes.ID = schedule.class_ID
+  GROUP BY elective.ID)
+  
+SELECT MAX(students.CT), teachers.first_name, teachers.last_name 
+FROM students
+JOIN teachers ON students.ID = teachers.ID;
+
+
+-- Which teachers don't have a class during the first period?
+
+SELECT teachers.* FROM teachers
+
+EXCEPT
+
+SELECT teachers.* FROM teachers
+JOIN classes ON teachers.ID = classes.teacher_ID
+WHERE period_ID = 1;
+
